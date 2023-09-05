@@ -1,0 +1,26 @@
+{
+  "name": "listeningtoearn",
+  "version": "1.0.0",
+  "description": "This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.",
+  "main": "hardhat.config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AbuSantos/ListeningToEarn.git"
+  },
+  "author": "King_Julien",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/AbuSantos/ListeningToEarn/issues"
+  },
+  "homepage": "https://github.com/AbuSantos/ListeningToEarn#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "hardhat": "^2.17.2"
+  }
+}
