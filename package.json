@@ -21,6 +21,14 @@
   "homepage": "https://github.com/AbuSantos/ListeningToEarn#readme",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^3.0.0",
-    "hardhat": "^2.17.2"
+    "@nomiclabs/hardhat-ethers": "npm:hardhat-deploy-ethers@^0.4.1",
+    "@nomiclabs/hardhat-web3": "^2.0.0",
+    "@openzeppelin/contracts": "^4.9.3",
+    "@openzeppelin/test-helpers": "^0.5.16",
+    "ethers": "^6.7.1",
+    "hardhat": "^2.17.2",
+    "hardhat-deploy": "^0.11.37",
+    "solidity-coverage": "^0.8.4",
+    "web3": "^1.10.2"
   }
 }
