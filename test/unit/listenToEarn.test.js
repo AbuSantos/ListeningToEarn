@@ -2,6 +2,7 @@ const { deployments, ethers, getNamedAccounts } = require("hardhat");
 const { initialRate } = require("../../helper-hardhat-config");
 
 const { assert } = require("chai");
+const { BN } = require("bn.js");
 
 describe("ListenToEarn", async function () {
   let listenToEarn, deployer, myToken, user1, user2;
@@ -53,7 +54,31 @@ describe("ListenToEarn", async function () {
     it("adds user to the array of users", async () => {
       await listenToEarn.connect(user2).registerUser();
       const user = await listenToEarn.users(0);
-      assert.equal(user, user2);
+      assert.equal(user, user2.address);
+    });
+
+    it("increases the count of the registeredUser", async () => {
+      //getting the initial count of the registeredUser
+      const initialCount = await listenToEarn.registeredUser();
+
+      //connect to the listenToEarn contract and register a user
+      await listenToEarn.connect(user1).registerUser();
+
+      //getting the initial count of the registeredUser
+      const newCount = await listenToEarn.registeredUser();
+
+      //using the BN lib
+      const initialCountB = new BN(initialCount.toString());
+      const newCountB = new BN(newCount.toString());
+
+      //checking the initial count has increased after the registration
+      //addn is a bn.js function used to add a number 
+      const resInitial = initialCountB.addn(1); 
+
+      assert.isTrue(
+        resInitial.eq(newCountB),
+        "RegisteredUser count should increase by 1 after registering"
+      );
     });
   });
 });
