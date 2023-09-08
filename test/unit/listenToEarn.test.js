@@ -4,12 +4,15 @@ const { initialRate } = require("../../helper-hardhat-config");
 const { assert } = require("chai");
 
 describe("ListenToEarn", async function () {
-  let listenToEarn, deployer, myToken;
+  let listenToEarn, deployer, myToken, user1, user2;
 
   const address0 = 0x5fbdb2315678afecb367f032d93f642f64180aa3;
 
   beforeEach(async function () {
     deployer = (await getNamedAccounts()).deployer;
+    const accounts = await ethers.getSigners();
+    user1 = accounts[0];
+    user2 = accounts[1];
     //the fixture object from deployments allows us to use the tags from the deployment functions
     await deployments.fixture(["all"]);
     //gives us the most recent deployment of the contract and we connect our deployer to the ListenToEarn contract
@@ -36,20 +39,21 @@ describe("ListenToEarn", async function () {
   });
 
   describe("registerUser", async () => {
-    const [owner] = await ethers.getSigners();
-    it("successfully registers a user", async () => {
-      const isUser = await listenToEarn.isUser(deployer);
+    it("User cannot be registered on initial deployment", async () => {
+      const isUser = await listenToEarn.isUser(user1);
       assert.isFalse(isUser, "User should be registered");
     });
 
     it("successfully registers a user", async () => {
-      await listenToEarn
-        .connect(ethers.provider.getSigner(owner))
-        .registerUser();
-
-      const isRegistered = await listenToEarn.isUser(owner);
-      //   const isUser = await listenToEarn.isUser(registeredUser);
+      await listenToEarn.connect(user1).registerUser();
+      const isRegistered = await listenToEarn.isUser(user1);
       assert.isTrue(isRegistered, "User should be registered");
+    });
+
+    it("adds user to the array of users", async () => {
+      await listenToEarn.connect(user2).registerUser();
+      const user = await listenToEarn.users(0);
+      assert.equal(user, user2);
     });
   });
 });
