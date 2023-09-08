@@ -1,7 +1,7 @@
 const { deployments, ethers, getNamedAccounts } = require("hardhat");
 const { initialRate } = require("../../helper-hardhat-config");
 
-const { assert } = require("chai");
+const { assert, expect } = require("chai");
 const { BN } = require("bn.js");
 
 describe("ListenToEarn", async function () {
@@ -51,6 +51,35 @@ describe("ListenToEarn", async function () {
       assert.isTrue(isRegistered, "User should be registered");
     });
 
+    it("requires a registration fee when userCounts greater than 1000", async () => {
+      //get the user counts
+      const userCount = await listenToEarn.registeredUser();
+
+      //setting the reg fee
+      const regFee = new BN(100);
+      const userBalance = new BN(50);
+
+      //sending the regfee to the user
+      myToken.transfer(user1, regFee.toString());
+
+      //registration when the user counts is greater than 1000
+      if (userCount > new BN(1000)) {
+        // assert.isTrue(
+        //   userBalance.gte(regFee),
+        //   "userBalance greater than reg fee"
+        // );
+
+        //connects the user
+        await listenToEarn.connect(user1).registerUser();
+
+        const user1Balance = await myToken.balanceOf(user1);
+        assert.isTrue(
+          user1Balance.eq(),
+          "User's token balance is incorrect after registration"
+        );
+      }
+    });
+
     it("adds user to the array of users", async () => {
       await listenToEarn.connect(user2).registerUser();
       const user = await listenToEarn.users(0);
@@ -72,13 +101,9 @@ describe("ListenToEarn", async function () {
       const newCountB = new BN(newCount.toString());
 
       //checking the initial count has increased after the registration
-      //addn is a bn.js function used to add a number 
-      const resInitial = initialCountB.addn(1); 
-
-      assert.isTrue(
-        resInitial.eq(newCountB),
-        "RegisteredUser count should increase by 1 after registering"
-      );
+      //addn is a bn.js function used to add a number
+      const resInitial = initialCountB.addn(1);
+      expect(newCountB).to.equal(resInitial);
     });
   });
 });
