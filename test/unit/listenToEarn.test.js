@@ -57,26 +57,17 @@ describe("ListenToEarn", async function () {
 
       //setting the reg fee
       const regFee = new BN(100);
-      const userBalance = new BN(50);
+      const userBalance = new BN(500);
 
       //sending the regfee to the user
-      myToken.transfer(user1, regFee.toString());
+      await myToken.transfer(user1, regFee.toString());
 
       //registration when the user counts is greater than 1000
       if (userCount > new BN(1000)) {
-        // assert.isTrue(
-        //   userBalance.gte(regFee),
-        //   "userBalance greater than reg fee"
-        // );
-
-        //connects the user
+        // //connects the user
         await listenToEarn.connect(user1).registerUser();
-
         const user1Balance = await myToken.balanceOf(user1);
-        assert.isTrue(
-          user1Balance.eq(),
-          "User's token balance is incorrect after registration"
-        );
+        expect(user1Balance).to.equal(userBalance - regFee);
       }
     });
 
@@ -104,6 +95,23 @@ describe("ListenToEarn", async function () {
       //addn is a bn.js function used to add a number
       const resInitial = initialCountB.addn(1);
       expect(newCountB).to.equal(resInitial);
+    });
+  });
+
+  describe("checks and Updates rate", async () => {
+    it("reduces the rate and burns tokens when registeredUser is a multiple of 1000", async () => {
+      const userCount = await listenToEarn.registeredUser();
+      await listenToEarn.connect(user1);
+
+      await listenToEarn._checkAndUpdateRate();
+
+      const initialRate = new BN(1000);
+      const registeredCount = new BN(1000);
+
+      const currentRate = listenToEarn.currentRate();
+
+      const updatedRate = initialRate.sub(new BN(25)); //0.25% reduction
+      assert.isTrue(currentRate.eq(updatedRate));
     });
   });
 });
