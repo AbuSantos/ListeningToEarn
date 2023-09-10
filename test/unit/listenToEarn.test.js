@@ -1,5 +1,6 @@
 const { deployments, ethers, getNamedAccounts } = require("hardhat");
 const { initialRate } = require("../../helper-hardhat-config");
+const { time, constants } = require("@openzeppelin/test-helpers"); // Import OpenZeppelin's time utility
 
 const { assert, expect } = require("chai");
 const { BN } = require("bn.js");
@@ -112,6 +113,56 @@ describe("ListenToEarn", async function () {
 
       const updatedRate = initialRate.sub(new BN(25)); //0.25% reduction
       assert.isTrue(currentRate.eq(updatedRate));
+    });
+  });
+
+  describe("start listening", async () => {
+    // it("allows the user to continue listening within the same week", async () => {
+    //   //increases the time by 1hour and mines a new block with that timestamp.
+    //   await time.increase(3600);
+
+    //   // Start a listening session
+    //   await listenToEarn.connect(user1).registerUser();
+    //   await listenToEarn.connect(user1).startListening();
+
+    //   //now we check that the updated time as been updated
+    //   const updatedTime = await listenToEarn.lastListeningTime(user1);
+    //   const currentTime = await time.latest();
+    //   console.log(currentTime.toString());
+    //   assert.isTrue(
+    //     updatedTime > currentTime - 3600,
+    //     "Last listening time was not updated correctly"
+    //   );
+    // });
+
+    it("allows the user to start a listening session", async function () {
+      // Check the initial lastListeningTime for the user
+      const initialLastListeningTime = await listenToEarn.lastListeningTime(
+        user1
+      );
+      console.log(
+        "Initial Last Listening Time:",
+        initialLastListeningTime.toString()
+      );
+
+      // Start a listening session
+      await listenToEarn.connect(user1).registerUser();
+      await listenToEarn.connect(user1).startListening();
+
+      // Check the updated lastListeningTime for the user
+      const updatedLastListeningTime = await listenToEarn.lastListeningTime(
+        user1
+      );
+      console.log(
+        "Updated Last Listening Time:",
+        updatedLastListeningTime.toString()
+      );
+
+      // Check that the lastListeningTime has been updated
+      assert.isTrue(
+        updatedLastListeningTime.gt(initialLastListeningTime),
+        "Last listening time was not updated correctly"
+      );
     });
   });
 });

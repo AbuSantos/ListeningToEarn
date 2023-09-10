@@ -64,6 +64,7 @@ contract ListenToEarn {
     mapping(address => uint256) public lastRewardTime;
     mapping(address => uint256) public accumulatedListeningTime;
     mapping(address => bool) public isUser;
+
     // uint trialUser =
     //     lastListeningTime[
     //         0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2
@@ -137,15 +138,21 @@ contract ListenToEarn {
      */
     function startListening() public onlyUser {
         //7DAYS = 604,800 Seconds >= 4,838,400  1,693,784,083 1693296160 1693887000 5000000000000
-        require(
-            lastListeningTime[msg.sender] + weekDuration >= block.timestamp,
-            "listening session expired"
-        );
+        // require(
+        //     lastListeningTime[msg.sender] + weekDuration >= block.timestamp,
+        //     "listening session expired"
+        // );
+        uint256 currentTime = block.timestamp;
+        if (currentTime >= lastListeningTime[msg.sender] + weekDuration) {
+            if (accumulatedListeningTime[msg.sender] < listeningTimeThreshold) {
+                accumulatedListeningTime[msg.sender] = 0;
+            }
+        }
 
         //This checks whether a new week has started since the last listening session, if yes it restarts the accumulated time
-        if (block.timestamp >= lastListeningTime[msg.sender] + weekDuration) {
-            accumulatedListeningTime[msg.sender] = 0;
-        }
+        // if (block.timestamp >= lastListeningTime[msg.sender] + weekDuration) {
+        //     accumulatedListeningTime[msg.sender] = 0;
+        // }
         lastListeningTime[msg.sender] = block.timestamp;
     }
 
