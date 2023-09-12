@@ -48,7 +48,7 @@ contract ListenToEarn {
     uint256 public registeredUser;
 
     //The minimum time needed to earn
-    uint256 public listeningTimeThreshold = 2500 minutes;
+    mapping(address => uint256) public listeningTimeThreshold;
 
     //The minimum days to get pay out
     uint256 public weekDuration = 1 weeks;
@@ -58,8 +58,8 @@ contract ListenToEarn {
 
     //Array of users
     address[] public users;
-    bool public isFirstPaid;
-    bool public isFirstReduction;
+    mapping(address => bool) public isFirstPaid;
+    mapping(address => bool) public isFirstReduction;
 
     mapping(address => uint256) public userBalance;
     mapping(address => uint256) public lastListeningTime;
@@ -100,11 +100,12 @@ contract ListenToEarn {
      * @notice registers a user
      * @dev A registeration fee is included after we get to a 1000 users **THIS IS OPTIONAL**
      * @dev the internal function, check and update is implemented when we meet the functions conditions
+     * @dev the threshold is set per ensure each user's listenThreshold is reduced by 50% after the initial withdrawal
      */
     function registerUser() public {
         //  * @param _user Address performing the registration
         require(!isUser[msg.sender], "already a registered member");
-
+        listeningTimeThreshold[msg.sender] == 2500 minutes;
         if (registeredUser >= 1000) {
             require(
                 token.transferFrom(
@@ -146,7 +147,10 @@ contract ListenToEarn {
         // );
         uint256 currentTime = block.timestamp;
         if (currentTime >= lastListeningTime[msg.sender] + weekDuration) {
-            if (accumulatedListeningTime[msg.sender] < listeningTimeThreshold) {
+            if (
+                accumulatedListeningTime[msg.sender] <
+                listeningTimeThreshold[msg.sender]
+            ) {
                 accumulatedListeningTime[msg.sender] = 0;
             }
         }
@@ -167,8 +171,8 @@ contract ListenToEarn {
      */
     function rewardUser(address _user) public payable onlyUser {
         require(
-            accumulatedListeningTime[_user] >= listeningTimeThreshold,
-            "accumulated time less than threshold"
+            accumulatedListeningTime[_user] >= listeningTimeThreshold[_user],
+            "user's accumulated time less than threshold"
         );
 
         //calculate the reward based of the accumulatedListeningTime
@@ -179,18 +183,18 @@ contract ListenToEarn {
         uint256 _listeningTime = block.timestamp - lastListeningTime[_user];
         accumulatedListeningTime[_user] = _listeningTime;
 
-        if (!isFirstPaid) {
-            isFirstPaid = true; //the listeningtimethreshold is reduced after first payout
+        if (!isFirstPaid[_user]) {
+            isFirstPaid[_user] = true; //the listeningtimethreshold is reduced after first payout
         } else {
             require(
                 block.timestamp >= lastRewardTime[_user] + weekDuration,
                 "withdrawal is allowed once a week"
             );
-            require(!isFirstReduction, "threshold already reduced");
+            require(!isFirstReduction[_user], "threshold already reduced");
         }
-        if (isFirstPaid && isFirstReduction) {
-            listeningTimeThreshold = listeningTimeThreshold / 2;
-            isFirstReduction = true;
+        if (isFirstPaid[_user] && !isFirstReduction[_user]) {
+            listeningTimeThreshold[_user] = listeningTimeThreshold[_user] / 2;
+            isFirstReduction[_user] = true;
         }
         accumulatedListeningTime[_user] = 0;
 
