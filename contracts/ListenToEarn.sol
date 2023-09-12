@@ -58,6 +58,8 @@ contract ListenToEarn {
 
     //Array of users
     address[] public users;
+    bool public isFirstPaid;
+    bool public isFirstReduction;
 
     mapping(address => uint256) public userBalance;
     mapping(address => uint256) public lastListeningTime;
@@ -165,25 +167,35 @@ contract ListenToEarn {
      */
     function rewardUser(address _user) public payable onlyUser {
         require(
-            lastListeningTime[_user] + weekDuration >= block.timestamp,
-            "listening session expired"
+            accumulatedListeningTime[_user] >= listeningTimeThreshold,
+            "accumulated time less than threshold"
         );
 
+        //calculate the reward based of the accumulatedListeningTime
+        uint256 rewardAmount = currentRate * accumulatedListeningTime[_user];
+        require(rewardAmount > 0, "User earned nothing");
+
+        //require(_user != address(this),"This contract cannot be rewarded.");
         uint256 _listeningTime = block.timestamp - lastListeningTime[_user];
         accumulatedListeningTime[_user] = _listeningTime;
 
-        if (accumulatedListeningTime[_user] >= listeningTimeThreshold) {
-            if (block.timestamp >= lastRewardTime[_user] + weekDuration) {
-                uint256 rewardAmount = currentRate *
-                    accumulatedListeningTime[_user];
-                console.log(rewardAmount);
-                require(rewardAmount > 0, "User earned nothing");
-                _forwardRewards(_user, rewardAmount);
-
-                accumulatedListeningTime[_user] = 0;
-                lastRewardTime[_user] = block.timestamp;
-            }
+        if (!isFirstPaid) {
+            isFirstPaid = true; //the listeningtimethreshold is reduced after first payout
+        } else {
+            require(
+                block.timestamp >= lastRewardTime[_user] + weekDuration,
+                "withdrawal is allowed once a week"
+            );
+            require(!isFirstReduction, "threshold already reduced");
         }
+        if (isFirstPaid && isFirstReduction) {
+            listeningTimeThreshold = listeningTimeThreshold / 2;
+            isFirstReduction = true;
+        }
+        accumulatedListeningTime[_user] = 0;
+
+        _forwardRewards(_user, rewardAmount);
+        lastRewardTime[_user] = block.timestamp;
     }
 
     /**
