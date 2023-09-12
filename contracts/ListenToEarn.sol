@@ -66,6 +66,7 @@ contract ListenToEarn {
     mapping(address => uint256) public lastRewardTime;
     mapping(address => uint256) public accumulatedListeningTime;
     mapping(address => bool) public isUser;
+    mapping(address => uint256) public listeningSessionStartTime;
 
     // uint trialUser =
     //     lastListeningTime[
@@ -141,10 +142,6 @@ contract ListenToEarn {
      */
     function startListening() public onlyUser {
         //7DAYS = 604,800 Seconds >= 4,838,400  1,693,784,083 1693296160 1693887000 5000000000000
-        // require(
-        //     lastListeningTime[msg.sender] + weekDuration >= block.timestamp,
-        //     "listening session expired"
-        // );
         uint256 currentTime = block.timestamp;
         if (currentTime >= lastListeningTime[msg.sender] + weekDuration) {
             if (
@@ -160,6 +157,17 @@ contract ListenToEarn {
         //     accumulatedListeningTime[msg.sender] = 0;
         // }
         lastListeningTime[msg.sender] = block.timestamp;
+        listeningSessionStartTime[msg.sender] = block.timestamp;
+    }
+
+    function endListening() public onlyUser {
+        uint256 sessionStartTime = listeningSessionStartTime[msg.sender];
+        if (sessionStartTime > 0) {
+            uint256 sessionDuration = block.timestamp - sessionStartTime;
+            accumulatedListeningTime[msg.sender] += sessionDuration;
+            listeningSessionStartTime[msg.sender] = 0;
+        }
+        // Reset the session start time
     }
 
     /**
