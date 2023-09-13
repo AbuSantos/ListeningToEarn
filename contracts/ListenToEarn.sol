@@ -152,14 +152,14 @@ contract ListenToEarn {
             }
         }
 
-        //This checks whether a new week has started since the last listening session, if yes it restarts the accumulated time
-        // if (block.timestamp >= lastListeningTime[msg.sender] + weekDuration) {
-        //     accumulatedListeningTime[msg.sender] = 0;
-        // }
         lastListeningTime[msg.sender] = block.timestamp;
         listeningSessionStartTime[msg.sender] = block.timestamp;
     }
 
+    /**
+     * @notice ends a listening session
+     * @dev creates a session and session duration to track the users time spent listening to a track, the session time is then assigned to the users accumulated time and the session is restarted
+     */
     function endListening() public onlyUser {
         uint256 sessionStartTime = listeningSessionStartTime[msg.sender];
         if (sessionStartTime > 0) {
@@ -167,7 +167,6 @@ contract ListenToEarn {
             accumulatedListeningTime[msg.sender] += sessionDuration;
             listeningSessionStartTime[msg.sender] = 0;
         }
-        // Reset the session start time
     }
 
     /**
@@ -194,11 +193,11 @@ contract ListenToEarn {
         if (!isFirstPaid[_user]) {
             isFirstPaid[_user] = true; //the listeningtimethreshold is reduced after first payout
         } else {
+            require(!isFirstReduction[_user], "threshold already reduced");
             require(
                 block.timestamp >= lastRewardTime[_user] + weekDuration,
                 "withdrawal is allowed once a week"
             );
-            require(!isFirstReduction[_user], "threshold already reduced");
         }
         if (isFirstPaid[_user] && !isFirstReduction[_user]) {
             listeningTimeThreshold[_user] = listeningTimeThreshold[_user] / 2;
@@ -206,8 +205,8 @@ contract ListenToEarn {
         }
         accumulatedListeningTime[_user] = 0;
 
-        _forwardRewards(_user, rewardAmount);
         lastRewardTime[_user] = block.timestamp;
+        _forwardRewards(_user, rewardAmount);
     }
 
     /**
@@ -237,8 +236,8 @@ contract ListenToEarn {
         require(_beneficiary != address(0));
         require(_tokenAmount != 0);
 
-        token.transfer(_beneficiary, _tokenAmount);
         userBalance[_beneficiary] += _tokenAmount;
+        token.transfer(_beneficiary, _tokenAmount);
     }
 
     function getDate() public view returns (uint) {
