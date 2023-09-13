@@ -158,7 +158,7 @@ contract ListenToEarn {
 
     /**
      * @notice ends a listening session
-     * @dev creates a session and session duration to track the users time spent listening to a track, the session time is then assigned to the users accumulated time and the session is restarted
+     * @dev creates a session and session duration to track the users time spent listening to a track, the session time
      */
     function endListening() public onlyUser {
         uint256 sessionStartTime = listeningSessionStartTime[msg.sender];
@@ -167,6 +167,7 @@ contract ListenToEarn {
             accumulatedListeningTime[msg.sender] += sessionDuration;
             listeningSessionStartTime[msg.sender] = 0;
         }
+        // Reset the session start time
     }
 
     /**

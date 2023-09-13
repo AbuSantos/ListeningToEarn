@@ -117,52 +117,48 @@ describe("ListenToEarn", async function () {
   });
 
   describe("start listening", async () => {
-    // it("allows the user to continue listening within the same week", async () => {
-    //   //increases the time by 1hour and mines a new block with that timestamp.
-    //   await time.increase(3600);
+    it("records the start of users listening time", async () => {
+      //get the initial time
+      const startTime = await time.latest();
 
-    //   // Start a listening session
-    //   await listenToEarn.connect(user1).registerUser();
-    //   await listenToEarn.connect(user1).startListening();
+      await listenToEarn.connect(user1).registerUser();
+      await listenToEarn.connect(user1).startListening();
 
-    //   //now we check that the updated time as been updated
-    //   const updatedTime = await listenToEarn.lastListeningTime(user1);
-    //   const currentTime = await time.latest();
-    //   console.log(currentTime.toString());
-    //   assert.isTrue(
-    //     updatedTime > currentTime - 3600,
-    //     "Last listening time was not updated correctly"
-    //   );
-    // });
+      const updatedLastListeningTime = await listenToEarn.lastListeningTime(
+        user1.address
+      );
+
+      assert.isAbove(updatedLastListeningTime, startTime);
+    });
+    it("records the start of users listening session", async () => {
+      //get the initial time
+      const startTime = await time.latest();
+
+      await listenToEarn.connect(user1).registerUser();
+      await listenToEarn.connect(user1).startListening();
+
+      const updatedLastListeningSession =
+        await listenToEarn.listeningSessionStartTime(user1.address);
+
+      assert.isAbove(updatedLastListeningSession, startTime);
+    });
 
     it("allows the user to start a listening session", async function () {
       // Check the initial lastListeningTime for the user
-      const initialLastListeningTime = await listenToEarn.lastListeningTime(
-        user1
-      );
-      console.log(
-        "Initial Last Listening Time:",
-        initialLastListeningTime.toString()
-      );
+      const startTime = await time.latest();
 
       // Start a listening session
       await listenToEarn.connect(user1).registerUser();
       await listenToEarn.connect(user1).startListening();
 
+      await time.advanceBlock();
       // Check the updated lastListeningTime for the user
       const updatedLastListeningTime = await listenToEarn.lastListeningTime(
-        user1
+        user1.address
       );
-      console.log(
-        "Updated Last Listening Time:",
-        updatedLastListeningTime.toString()
-      );
-
+      const afterListeningTime = await time.latest();
       // Check that the lastListeningTime has been updated
-      assert.isTrue(
-        updatedLastListeningTime.gt(initialLastListeningTime),
-        "Last listening time was not updated correctly"
-      );
+      assert.isBelow(updatedLastListeningTime, afterListeningTime);
     });
   });
 });
