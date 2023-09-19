@@ -1,11 +1,11 @@
-// SPDX-License-Identifierc: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract BullchordNft is ERC721Enumerable, Ownable {
+contract BullchordNFT is ERC721Enumerable, Ownable {
     using Counters for Counters.Counter;
     string private baseTokenURI;
     bool public mintEnabled = true;
@@ -29,9 +29,8 @@ contract BullchordNft is ERC721Enumerable, Ownable {
         require(mintEnabled, "Minting is Disabled");
         require(
             totalSupply() + 10 <= i_MAX_SUPPLY,
-            "Total supply is maxed out"
+            "Total Supply is maxed out"
         );
-
         for (uint256 i = 0; i < 10; i++) {
             uint256 _tokenId = totalSupply();
             _mint(msg.sender, _tokenId);
