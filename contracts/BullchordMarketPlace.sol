@@ -229,9 +229,11 @@ contract BullchordMarketPlace is ReentrancyGuard {
 
         proceeds[marketItem.seller] += msg.value;
 
+        // Mark the NFT as sold and remove it from the marketplace
         isSold[_tokenId] = true;
         delete (idToMarketItem[_tokenId]);
 
+        // Transfer ownership of the NFT to the buyer
         nftContract.transferFrom(marketItem.seller, msg.sender, _tokenId);
     }
 
@@ -290,5 +292,167 @@ contract BullchordMarketPlace is ReentrancyGuard {
         newBid.from = payable(msg.sender);
         newBid.amount = bidAmount;
         userBids[_tokenId].push(newBid);
+    }
+
+    /**
+     * @dev Withdraw proceeds from the marketplace.
+     *
+     * This function allows sellers to withdraw their earnings (proceeds) from the marketplace.
+     * Sellers can only withdraw proceeds if they have earnings higher than 0.
+     *
+     * Upon successful withdrawal, the proceeds are transferred to the seller's address.
+     *
+     * Emits a `ProceedsWithdrawn` event when the withdrawal is successful.
+     */
+
+    function withdrawProceeds() external {
+        uint256 earning = proceeds[msg.sender];
+        require(earning > 0, "earnings must be higher than 0");
+        proceeds[msg.sender] = 0;
+        (bool success, ) = payable(msg.sender).call{value: earning}(" ");
+        require(success, "transaction failed");
+    }
+
+    /**
+     * @dev Withdraw proceeds from the marketplace.
+     *
+     * This function allows marketplace owner to withdraw their earnings (proceeds) from the marketplace.
+     * Owners can only withdraw proceeds if they have earnings higher than 0.
+     *
+     * Upon successful withdrawal, the proceeds are transferred to the owner's address.
+     *
+     * Emits a `ProceedsWithdrawn` event when the withdrawal is successful.
+     */
+    function withdrawFunds() external {
+        require(msg.sender == owner, "Not Allowed");
+        uint256 earning = listingProceeds;
+
+        require(earning > 0, "earnings must be higher than 0");
+        listingProceeds = 0;
+        (bool success, ) = payable(msg.sender).call{value: earning}("");
+        require(success, "transaction failed");
+    }
+
+    /**
+     * @dev Accept the highest bid and transfer ownership of a Bull NFT.
+     *
+     * This function allows the seller of a Bull NFT listed in the marketplace to accept the highest bid
+     * and transfer ownership of the NFT to the highest bidder.
+     *
+     * Requirements:
+     * - The caller must be the seller of the NFT.
+     * - There must be at least one valid bid for the NFT.
+     * - The highest bid amount will be transferred to the seller.
+     * - Ownership of the NFT will be transferred to the highest bidder.
+     *
+     * Emits a `OfferAccepted` event when the offer is successfully accepted.
+     *
+     * @param _tokenId The token ID of the Bull NFT to accept an offer for.
+     * @param _nftContract The address of the Bull NFT contract.
+     */
+
+    function acceptOffer(uint _tokenId, address _nftContract) external {
+        MarketItem memory marketItem = idToMarketItem[_tokenId];
+        nftContract = IERC721(_nftContract); //using the IERC721 interface  to access the nft
+
+        require(msg.sender == marketItem.seller, "you're not the owner");
+
+        uint bidsLength = userBids[_tokenId].length;
+        require(bidsLength > 0, "No valid bids");
+        // Get the highest bid
+
+        Bid memory lastBid = userBids[_tokenId][bidsLength - 1];
+
+        // Update state before making external calls
+        uint256 bidAmount = lastBid.amount;
+        marketItem.sold = true;
+        delete idToMarketItem[_tokenId];
+
+        // Clear the bids individually
+        for (uint i = 0; i < bidsLength; i++) {
+            delete userBids[_tokenId][i];
+        }
+
+        // Transfer the highest bid amount to the seller
+        (bool success, ) = payable(msg.sender).call{value: bidAmount}(" ");
+        require(success, "transaction failed");
+
+        // Transfer ownership of the NFT to the highest bidder
+        nftContract.transferFrom(marketItem.seller, lastBid.from, _tokenId);
+    }
+
+    /**
+     * @dev Cancel a Bull NFT listing on the marketplace.
+     *
+     * This function allows the seller to cancel their listing for a Bull NFT on the marketplace.
+     * The seller must be the owner of the listing.
+     *
+     * When a listing is canceled, the NFT remains in the ownership of the seller, and the listing
+     * information is removed from the marketplace.
+     *
+     * Emits a `ListingCanceled` event when the listing is successfully canceled.
+     *
+     * @param _tokenId The token ID of the Bull NFT listing to be canceled.
+     */
+
+    function cancelListing(uint256 _tokenId) external {
+        MarketItem memory marketItem = idToMarketItem[_tokenId];
+        require(msg.sender == marketItem.seller, "This is not your product");
+        isSold[_tokenId] = true;
+        delete (idToMarketItem[_tokenId]);
+    }
+
+    /**
+     * @dev Reject a bid offer for a Bull NFT listed in the marketplace.
+     *
+     * This function allows the seller to reject a bid offer made by a potential buyer for their
+     * listed Bull NFT. The offer is rejected by providing the token ID of the NFT and the
+     * address of the Bull NFT contract. The bid amount is refunded to the bidder.
+     *
+     * Requirements:
+     * - Only the seller of the NFT can reject bid offers for their own NFTs.
+     * - The NFT must be listed in the marketplace.
+     *
+     * Emits a `BidOfferRejected` event when the bid offer is successfully rejected and refunded.
+     *
+     * @param _tokenId The token ID of the Bull NFT for which the bid offer is rejected.
+     * @param _nftAddress The address of the Bull NFT contract.
+     */
+    function rejectBidOffer(uint256 _tokenId, address _nftAddress) external {
+        nftContract = IERC721(_nftAddress);
+        address seller = nftContract.ownerOf(_tokenId);
+        require(msg.sender == seller, "Only the seller can reject bid offers");
+
+        // Check if the NFT is listed in the marketplace
+        MarketItem storage marketItem = idToMarketItem[_tokenId];
+        require(
+            marketItem.seller == seller,
+            "NFT is not listed in the marketplace"
+        );
+
+        // Get the last bid offer for the NFT
+        Bid[] storage bids = userBids[_tokenId];
+        require(bids.length > 0, "No bids for this NFT");
+
+        Bid memory lastBid = bids[bids.length - 1];
+        address bidder = lastBid.from;
+        uint256 bidAmount = lastBid.amount;
+
+        // Refund the bid amount to the bidder
+        (bool success, ) = bidder.call{value: bidAmount}("");
+        require(success, "Refund to bidder failed");
+
+        // Remove the bid offer
+        bids.pop();
+
+        // Emit an event to log the bid offer rejection and refund
+        // emit BidOfferRejected(_tokenId, _nftAddress, seller, bidder, bidAmount);
+    }
+
+    /**
+     * @dev Disallow payments to this contract directly
+     */
+    fallback() external {
+        revert();
     }
 }
