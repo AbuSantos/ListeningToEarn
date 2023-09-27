@@ -4,10 +4,11 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "hardhat/console.sol";
 
-contract BullchordMarketPlace {
+contract BullchordMarketPlace is ReentrancyGuard {
     IERC721 public nftContract;
 
     Counters.Counter private _itemsSold;
@@ -215,7 +216,10 @@ contract BullchordMarketPlace {
      * @param _nftAddress The address of the Bull NFT contract.
      */
 
-    function buyBull(uint256 _tokenId, address _nftAddress) external payable {
+    function buyBull(
+        uint256 _tokenId,
+        address _nftAddress
+    ) external payable nonReentrant {
         nftContract = IERC721(_nftAddress);
         address _owner = nftContract.ownerOf(_tokenId);
         require(msg.sender != _owner, "You cannot buy your own product");
@@ -229,5 +233,62 @@ contract BullchordMarketPlace {
         delete (idToMarketItem[_tokenId]);
 
         nftContract.transferFrom(marketItem.seller, msg.sender, _tokenId);
+    }
+
+    /**
+     * @dev Place a bid on a Bull NFT listed in the marketplace.
+     *
+     * This function allows users to place bids on Bull NFTs that are listed for sale
+     * in the marketplace. The bid amount must be greater than 0 and higher than any
+     * previous bid on the same NFT.
+     *
+     * Requirements:
+     * - The bid amount (`msg.value`) must be greater than 0.
+     * - The caller cannot bid on their own NFT.
+     * - The bid amount must be higher than the previous highest bid, if any.
+     * - If a previous bid exists, the amount of the previous highest bid will be refunded
+     *   to the previous bidder.
+     *
+     * Upon a successful bid, the new bid is recorded, and the previous highest bidder's
+     * funds are refunded. Users can check their bids using the `userBids` mapping.
+     *
+     * @param _tokenId The token ID of the Bull NFT to place a bid on.
+     * @param _nftAddress The address of the Bull NFT contract.
+     */
+    function bid(
+        uint256 _tokenId,
+        address _nftAddress
+    ) external payable nonReentrant {
+        uint256 bidAmount = msg.value;
+
+        require(bidAmount > 0, "Bid should be > 0");
+        nftContract = IERC721(_nftAddress);
+        address _owner = nftContract.ownerOf(_tokenId);
+        require(_owner != msg.sender, "You cannot bid on your own NFT");
+
+        Bid memory lastBid;
+        uint256 bidLength = userBids[_tokenId].length;
+        uint tempAmount;
+
+        if (bidLength > 0) {
+            //this will give us the last bid made on the NFT.
+            lastBid = userBids[_tokenId][bidLength - 1];
+            tempAmount = lastBid.amount;
+        }
+
+        //then we check if the current bid is greater than the last bid
+        require(bidAmount > tempAmount, "bid amount too low");
+
+        // we refund the last bidder if the current Bid is greater than the last bid.
+        if (bidLength > 0) {
+            (bool success, ) = lastBid.from.call{value: lastBid.amount}("");
+            require(success, "refund failed");
+        }
+
+        //we insert the bid
+        Bid memory newBid;
+        newBid.from = payable(msg.sender);
+        newBid.amount = bidAmount;
+        userBids[_tokenId].push(newBid);
     }
 }
