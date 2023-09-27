@@ -164,6 +164,7 @@ contract BullchordMarketPlace {
         uint256 _price
     )
         external
+        payable
         isOwner(_nftAddress, _tokenId, msg.sender)
         isListed(_nftAddress, _tokenId)
     {
@@ -196,5 +197,37 @@ contract BullchordMarketPlace {
         isSold[_tokenId] = false;
     }
 
-    function buyBul(_tokenId,
+    /**
+     * @dev Buy a Bull NFT from the marketplace.
+     *
+     * This function allows users to purchase a Bull NFT listed for sale on the marketplace.
+     *
+     * Requirements:
+     * - The caller must not be the owner of the NFT specified by `_nftAddress` and `_tokenId`.
+     * - The provided Ether value must be greater than or equal to the listed price of the NFT.
+     *
+     * The purchase proceeds are transferred to the seller's address, and the NFT ownership is
+     * transferred to the buyer.
+     *
+     * Emits a `BullPurchased` event when the purchase is successful.
+     *
+     * @param _tokenId The token ID of the Bull NFT to be purchased.
+     * @param _nftAddress The address of the Bull NFT contract.
+     */
+
+    function buyBull(uint256 _tokenId, address _nftAddress) external payable {
+        nftContract = IERC721(_nftAddress);
+        address _owner = nftContract.ownerOf(_tokenId);
+        require(msg.sender != _owner, "You cannot buy your own product");
+
+        MarketItem memory marketItem = idToMarketItem[_tokenId];
+        require(msg.value >= marketItem.price, "Price not Met");
+
+        proceeds[marketItem.seller] += msg.value;
+
+        isSold[_tokenId] = true;
+        delete (idToMarketItem[_tokenId]);
+
+        nftContract.transferFrom(marketItem.seller, msg.sender, _tokenId);
+    }
 }
