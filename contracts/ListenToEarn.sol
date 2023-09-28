@@ -259,6 +259,7 @@ contract ListenToEarn {
      * the last reward time and the threshold reduction status.
      *
      * The rewarded amount is forwarded to the user's address using the `_forwardRewards` function.
+     * @param _user Address of the listener
      */
     function rewardUser(address _user) public payable onlyUser {
         // Check if the user's accumulated listening time meets the threshold
@@ -303,8 +304,18 @@ contract ListenToEarn {
 
     /**
      * @notice users can withdraw their funds
-     * @dev allows only register users to withdraw their funds. use require to revert state if conditions arent met.
+     * @dev Withdraw available funds from a user's balance.
+     *
+     * This function allows registered users to withdraw their available funds from their balance.
+     * Users can withdraw funds if their balance is greater than zero.
+     *
+     * Requirements:
+     * - The caller must be a registered user.
+     * - The user's balance must be greater than zero to initiate a withdrawal.
+     *
+     * Upon successful withdrawal, the user's balance is reset to zero, and the withdrawn funds
      * @param _user Address of the listener
+     * are transferred to the user's address using the `token.transfer` function.
      */
 
     function withdraw(address _user) public onlyUser {
@@ -316,19 +327,39 @@ contract ListenToEarn {
     }
 
     /**
-     * @notice forwards users rewards token
-     * @dev use require to revert state when conditions arent met
-     * @param _beneficiary Address of the listener
-     * @param _tokenAmount of user earned
+     * @dev Forward rewards to a specified beneficiary.
+     *
+     * This internal function is used to forward rewards in the form of tokens to a designated beneficiary.
+     * It ensures that the beneficiary address is valid and that the reward amount is greater than zero.
+     *
+     * @param _beneficiary The address of the beneficiary to receive the rewards.
+     * @param _tokenAmount The amount of tokens to be forwarded as rewards.
+     *
+     * Requirements:
+     * - The beneficiary address must not be the zero address.
+     * - The reward amount must be greater than zero.
+     *
+     * Upon successful forwarding, the reward amount is added to the beneficiary's balance
+     * using the `userBalance` mapping, and the tokens are transferred to the beneficiary's address
+     * using the `token.transfer` function.
      */
     function _forwardRewards(
         address _beneficiary,
         uint256 _tokenAmount
     ) internal {
-        require(_beneficiary != address(0));
-        require(_tokenAmount != 0);
+        // Ensure that the beneficiary address is not the zero address
+        require(
+            _beneficiary != address(0),
+            "Beneficiary address cannot be zero"
+        );
 
+        // Ensure that the reward amount is greater than zero
+        require(_tokenAmount > 0, "Reward amount must be greater than zero");
+
+        // Add the reward amount to the beneficiary's balance
         userBalance[_beneficiary] += _tokenAmount;
+
+        // Transfer the reward tokens to the beneficiary's address
         token.transfer(_beneficiary, _tokenAmount);
     }
 
