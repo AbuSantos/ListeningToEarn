@@ -449,6 +449,30 @@ contract BullchordMarketPlace is ReentrancyGuard {
         // emit BidOfferRejected(_tokenId, _nftAddress, seller, bidder, bidAmount);
     }
 
+    function getAllMarketItems() external view returns (MarketItem[] memory) {
+        uint totalItems = marketItems.length;
+        uint unsoldItemCount = 0;
+
+        // get all the item not sold,
+        for (uint i = 0; i < totalItems; i++) {
+            if (!isSold[marketItems[i].tokenId]) {
+                unsoldItemCount++;
+            }
+        }
+        // we instantiate and instance of marketItem array and we use the unsoldItem to get all items not sold.
+        MarketItem[] memory allMarketItems = new MarketItem[](unsoldItemCount);
+        uint currentIndex = 0;
+        for (uint i = 0; i < totalItems; i++) {
+            //first we check for all the items unsold
+            if (!isSold[marketItems[i].tokenId]) {
+                allMarketItems[currentIndex] = marketItems[i];
+                currentIndex++;
+            }
+        }
+
+        return allMarketItems;
+    }
+
     /**
      * @dev Disallow payments to this contract directly
      */
