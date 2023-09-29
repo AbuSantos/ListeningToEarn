@@ -473,6 +473,29 @@ contract BullchordMarketPlace is ReentrancyGuard {
         return allMarketItems;
     }
 
+    function getMarketItemsByUser(
+        address user
+    ) external view returns (MarketItem[] memory) {
+        uint[] memory userListingIds = marketItemsOwner[user];
+        MarketItem[] memory userMarketItems = new MarketItem[](
+            userListingIds.length
+        );
+
+        for (uint i = 0; i < userListingIds.length; i++) {
+            uint tokenId = userListingIds[i];
+            MarketItem storage item = idToMarketItem[tokenId];
+            userMarketItems[i] = MarketItem({
+                tokenId: item.tokenId,
+                seller: item.seller,
+                _nftContract: item._nftContract,
+                price: item.price,
+                sold: item.sold
+            });
+        }
+
+        return userMarketItems;
+    }
+
     /**
      * @dev Disallow payments to this contract directly
      */
