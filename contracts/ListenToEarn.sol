@@ -282,7 +282,7 @@ contract ListenToEarn {
             isFirstPaid[_user] = true; //the listeningtimethreshold is reduced after first payout
         } else {
             // Check if it's time for the user's weekly withdrawal
-            require(!isFirstReduction[_user], "threshold already reduced");
+            require(isFirstReduction[_user], "threshold already reduced");
             require(
                 block.timestamp >= lastRewardTime[_user] + weekDuration,
                 "withdrawal is allowed once a week"
