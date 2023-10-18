@@ -5,11 +5,29 @@ pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "./Royalty.sol";
 
 import "hardhat/console.sol";
 
 contract BullchordMarketPlace is ReentrancyGuard {
     IERC721 public nftContract;
+    uint256 private platformFee;
+
+    event NFTListed(address _nft, uint tokenId, uint price, address owner);
+    event ProceedWithdrawn(address owner, uint256 amount);
+    event FundsWithdrawn(address owner, uint256 amount);
+    event RoyaltySent(address owner, uint amount);
+    event NFTBought(address buyer, address seller, uint amount, uint tokenId);
+    event BidAccepted(
+        address seller,
+        address bidder,
+        uint amount,
+        uint tokenId
+    );
+    event UserAdded(address artiste);
+    event FeeUpdated(uint fee);
+    event ListingCanceled(uint tokenId);
+    event BidMade(address bidder, uint amount);
 
     Counters.Counter private _itemsSold;
     using Counters for Counters.Counter;
@@ -62,8 +80,9 @@ contract BullchordMarketPlace is ReentrancyGuard {
         address seller;
     }
 
-    constructor() {
+    constructor(uint256 _platformFee) {
         owner = payable(msg.sender);
+        platformFee = _platformFee;
     }
 
     modifier notListed(address _nftAddress, uint256 _tokenId) {
@@ -93,6 +112,16 @@ contract BullchordMarketPlace is ReentrancyGuard {
             revert("You're not the owner");
         }
         _;
+    }
+
+    /**
+     * @notice calculates the marketplace's cut in any sale as per price
+     * @param _price price at which an NFT is to be sold
+     */
+    function calculatePlatformFee(
+        uint256 _price
+    ) public view returns (uint256) {
+        return (_price * platformFee) / 10_000;
     }
 
     /**
@@ -136,6 +165,13 @@ contract BullchordMarketPlace is ReentrancyGuard {
         require(msg.sender == owner, "Not allowed!");
         require(!_inWhiteList(_user), "User already registered");
         whiteList.push(_user);
+        emit UserAdded(_user);
+    }
+
+    function updateListingFee(uint256 _listingFee) external payable {
+        require(owner == msg.sender, "only owner can change fee");
+        listingFee = _listingFee;
+        emit FeeUpdated(_listingFee);
     }
 
     /**
@@ -171,6 +207,7 @@ contract BullchordMarketPlace is ReentrancyGuard {
     {
         require(_price > 0, "The price of the Item must be > 0");
 
+        // Determine the listing price based on whitelist status
         uint256 actualListingFee = _inWhiteList(msg.sender)
             ? whitelistedListingFee
             : listingFee;
@@ -182,6 +219,7 @@ contract BullchordMarketPlace is ReentrancyGuard {
             revert("Not Approved For Marketplace");
         }
 
+        // Create the MarketItem and add it to the idToMarketItem mapping
         idToMarketItem[_tokenId] = MarketItem(
             _tokenId,
             msg.sender,
@@ -190,12 +228,17 @@ contract BullchordMarketPlace is ReentrancyGuard {
             false
         );
 
+        // Add the MarketItem to the marketItems array
         marketItems.push(
             MarketItem(_tokenId, msg.sender, _nftAddress, _price, false)
         );
-
+        // Add the NFT to the list of items owned by the seller
         marketItemsOwner[msg.sender].push(_tokenId);
+
+        // Mark the NFT as not sold
         isSold[_tokenId] = false;
+
+        emit NFTListed(_nftAddress, _tokenId, _price, msg.sender);
     }
 
     /**
@@ -213,28 +256,44 @@ contract BullchordMarketPlace is ReentrancyGuard {
      * Emits a `BullPurchased` event when the purchase is successful.
      *
      * @param _tokenId The token ID of the Bull NFT to be purchased.
-     * @param _nftAddress The address of the Bull NFT contract.
+     * @param _nftContract The address of the Bull NFT contract.
      */
 
-    function buyBull(
-        uint256 _tokenId,
-        address _nftAddress
-    ) external payable nonReentrant {
-        nftContract = IERC721(_nftAddress);
-        address _owner = nftContract.ownerOf(_tokenId);
-        require(msg.sender != _owner, "You cannot buy your own product");
-
+    function buyBull(address _nftContract, uint256 _tokenId) public payable {
+        nftContract = IERC721(_nftContract); //using the IERC721 interface  to access the nft
+        address ownerr = nftContract.ownerOf(_tokenId);
+        require(ownerr != msg.sender, "You cannot buy your product");
+        // Listing memory listings = s_listings[_nftContract][_tokenId];
         MarketItem memory marketItem = idToMarketItem[_tokenId];
-        require(msg.value >= marketItem.price, "Price not Met");
+        uint payPrice = msg.value;
 
-        proceeds[marketItem.seller] += msg.value;
+        if (payPrice < marketItem.price) {
+            revert("Price not met");
+        }
 
-        // Mark the NFT as sold and remove it from the marketplace
+        IRentableNFT nft = IRentableNFT(marketItem._nftContract);
+        (address royaltyRecipient, uint256 royalty) = nft.royaltyInfo(
+            _tokenId,
+            payPrice
+        );
+
+        if (royalty != 0) {
+            payPrice -= royalty;
+            payable(royaltyRecipient).transfer(royalty);
+        }
+
+        uint totalPlatFormFee = calculatePlatformFee(payPrice);
+        payPrice -= totalPlatFormFee;
+        listingProceeds += totalPlatFormFee;
+
+        proceeds[marketItem.seller] += payPrice;
+        marketItem.sold = true;
         isSold[_tokenId] = true;
         delete (idToMarketItem[_tokenId]);
-
-        // Transfer ownership of the NFT to the buyer
         nftContract.transferFrom(marketItem.seller, msg.sender, _tokenId);
+
+        emit RoyaltySent(royaltyRecipient, royalty);
+        emit NFTBought(msg.sender, marketItem.seller, payPrice, _tokenId);
     }
 
     /**
@@ -292,6 +351,7 @@ contract BullchordMarketPlace is ReentrancyGuard {
         newBid.from = payable(msg.sender);
         newBid.amount = bidAmount;
         userBids[_tokenId].push(newBid);
+        emit BidMade(msg.sender, bidAmount);
     }
 
     /**
@@ -306,11 +366,14 @@ contract BullchordMarketPlace is ReentrancyGuard {
      */
 
     function withdrawProceeds() external {
-        uint256 earning = proceeds[msg.sender];
+        require(owner == msg.sender, "Only owner");
+        uint256 earning = listingProceeds;
+
         require(earning > 0, "earnings must be higher than 0");
-        proceeds[msg.sender] = 0;
+        listingProceeds = 0;
         (bool success, ) = payable(msg.sender).call{value: earning}(" ");
         require(success, "transaction failed");
+        emit ProceedWithdrawn(owner, earning);
     }
 
     /**
@@ -324,13 +387,13 @@ contract BullchordMarketPlace is ReentrancyGuard {
      * Emits a `ProceedsWithdrawn` event when the withdrawal is successful.
      */
     function withdrawFunds() external {
-        require(msg.sender == owner, "Not Allowed");
-        uint256 earning = listingProceeds;
+        uint256 earning = proceeds[msg.sender];
 
         require(earning > 0, "earnings must be higher than 0");
-        listingProceeds = 0;
-        (bool success, ) = payable(msg.sender).call{value: earning}("");
+        proceeds[msg.sender] = 0;
+        (bool success, ) = payable(msg.sender).call{value: earning}(" ");
         require(success, "transaction failed");
+        emit FundsWithdrawn(owner, earning);
     }
 
     /**
@@ -356,29 +419,37 @@ contract BullchordMarketPlace is ReentrancyGuard {
         nftContract = IERC721(_nftContract); //using the IERC721 interface  to access the nft
 
         require(msg.sender == marketItem.seller, "you're not the owner");
-
         uint bidsLength = userBids[_tokenId].length;
-        require(bidsLength > 0, "No valid bids");
-        // Get the highest bid
-
         Bid memory lastBid = userBids[_tokenId][bidsLength - 1];
 
-        // Update state before making external calls
-        uint256 bidAmount = lastBid.amount;
-        marketItem.sold = true;
-        delete idToMarketItem[_tokenId];
+        IRentableNFT nft = IRentableNFT(marketItem._nftContract);
+        (address royaltyRecipient, uint256 royalty) = nft.royaltyInfo(
+            _tokenId,
+            lastBid.amount
+        );
 
-        // Clear the bids individually
-        for (uint i = 0; i < bidsLength; i++) {
-            delete userBids[_tokenId][i];
+        if (royalty != 0) {
+            lastBid.amount -= royalty;
+            payable(royaltyRecipient).transfer(royalty);
         }
 
-        // Transfer the highest bid amount to the seller
-        (bool success, ) = payable(msg.sender).call{value: bidAmount}(" ");
-        require(success, "transaction failed");
+        if (isItemStaked[_tokenId]) {
+            uint totalPlatFormFee = (lastBid.amount * 15) / 100;
+            lastBid.amount -= totalPlatFormFee;
+            listingProceeds += totalPlatFormFee;
+        }
 
-        // Transfer ownership of the NFT to the highest bidder
+        (bool success, ) = payable(msg.sender).call{value: lastBid.amount}(" ");
+        require(success, "transaction failed");
         nftContract.transferFrom(marketItem.seller, lastBid.from, _tokenId);
+
+        emit BidAccepted(
+            marketItem.seller,
+            lastBid.from,
+            lastBid.amount,
+            _tokenId
+        );
+        emit RoyaltySent(royaltyRecipient, royalty);
     }
 
     /**
@@ -400,6 +471,7 @@ contract BullchordMarketPlace is ReentrancyGuard {
         require(msg.sender == marketItem.seller, "This is not your product");
         isSold[_tokenId] = true;
         delete (idToMarketItem[_tokenId]);
+        emit ListingCanceled(_tokenId);
     }
 
     /**

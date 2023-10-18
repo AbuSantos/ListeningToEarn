@@ -46,6 +46,9 @@ contract ListenToEarn {
 
     //The registered users count
     uint256 public registeredUser;
+    uint256 public registeredListeners;
+    uint256 public streamingCount = 100;
+    uint public currentPrice = 50000000000000000 wei;
 
     //The minimum time needed to earn
     mapping(address => uint256) public listeningTimeThreshold;
@@ -202,8 +205,11 @@ contract ListenToEarn {
         }
 
         // Update the last listening time and the start time of the current session
-        lastListeningTime[msg.sender] = block.timestamp;
-        listeningSessionStartTime[msg.sender] = block.timestamp;
+        if (isUser[msg.sender]) {
+            lastListeningTime[msg.sender] = block.timestamp;
+            listeningSessionStartTime[msg.sender] = block.timestamp;
+            registeredListeners++;
+        }
     }
 
     /**
@@ -361,6 +367,19 @@ contract ListenToEarn {
 
         // Transfer the reward tokens to the beneficiary's address
         token.transfer(_beneficiary, _tokenAmount);
+    }
+
+    function _usersCountEarned() internal view returns (uint) {
+        uint reduction = (currentRate * 25) / 100000;
+        return reduction * registeredListeners;
+    }
+
+    function _marketValue() public view returns (uint) {
+        return (_streamingEarned() + _usersCountEarned() + currentPrice);
+    }
+
+    function _streamingEarned() internal view returns (uint) {
+        return streamingCount * currentRate;
     }
 
     function getDate() public view returns (uint) {
